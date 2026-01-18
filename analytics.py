@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func, extract
-from models import Product, Sale, Business
+from models import Product, Sale, Business, MediaPost
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
 import pandas as pd
@@ -258,3 +258,212 @@ def get_revenue_by_product(db: Session, business_id: int) -> List[Dict[str, Any]
     
     revenue_data.sort(key=lambda x: x["revenue"], reverse=True)
     return revenue_data
+
+
+def get_media_posts(db: Session, business_id: int) -> List[Dict[str, Any]]:
+    posts = db.query(MediaPost).filter(
+        MediaPost.business_id == business_id
+    ).order_by(MediaPost.posted_at.desc()).all()
+    
+    return [{
+        "id": p.id,
+        "post_type": p.post_type,
+        "caption": p.caption,
+        "posted_at": p.posted_at.strftime("%Y-%m-%d"),
+        "impressions": p.impressions,
+        "likes": p.likes,
+        "comments": p.comments,
+        "shares": p.shares,
+        "engagement": p.likes + p.comments + p.shares
+    } for p in posts]
+
+
+def get_media_impact_stats(db: Session, business_id: int) -> Dict[str, Any]:
+    posts = db.query(MediaPost).filter(MediaPost.business_id == business_id).all()
+    
+    if not posts:
+        return {
+            "total_posts": 0,
+            "total_reels": 0,
+            "total_stories": 0,
+            "avg_engagement": 0,
+            "avg_lift": 0,
+            "total_incremental_revenue": 0
+        }
+    
+    products = db.query(Product).filter(Product.business_id == business_id).all()
+    product_ids = [p.id for p in products]
+    
+    total_reels = sum(1 for p in posts if p.post_type == "reel")
+    total_stories = sum(1 for p in posts if p.post_type == "story")
+    total_engagement = sum(p.likes + p.comments + p.shares for p in posts)
+    avg_engagement = total_engagement / len(posts) if posts else 0
+    
+    total_lift = 0
+    total_incremental = 0
+    
+    for post in posts:
+        impact = calculate_post_impact(db, post, product_ids)
+        total_lift += impact["lift_percent"]
+        total_incremental += impact["incremental_revenue"]
+    
+    avg_lift = total_lift / len(posts) if posts else 0
+    
+    return {
+        "total_posts": len(posts),
+        "total_reels": total_reels,
+        "total_stories": total_stories,
+        "avg_engagement": round(avg_engagement, 1),
+        "avg_lift": round(avg_lift, 1),
+        "total_incremental_revenue": round(total_incremental, 2)
+    }
+
+
+def calculate_post_impact(db: Session, post: MediaPost, product_ids: List[int]) -> Dict[str, Any]:
+    post_date = post.posted_at
+    
+    before_start = post_date - timedelta(days=7)
+    before_end = post_date - timedelta(days=1)
+    
+    after_start = post_date
+    after_end = post_date + timedelta(days=3)
+    
+    before_sales = db.query(func.sum(Sale.total_amount)).filter(
+        Sale.product_id.in_(product_ids),
+        Sale.sale_date >= before_start,
+        Sale.sale_date <= before_end
+    ).scalar() or 0
+    
+    after_sales = db.query(func.sum(Sale.total_amount)).filter(
+        Sale.product_id.in_(product_ids),
+        Sale.sale_date >= after_start,
+        Sale.sale_date <= after_end
+    ).scalar() or 0
+    
+    before_days = (before_end - before_start).days + 1
+    after_days = (after_end - after_start).days + 1
+    
+    baseline_daily = before_sales / before_days if before_days > 0 else 0
+    post_daily = after_sales / after_days if after_days > 0 else 0
+    
+    lift_percent = ((post_daily - baseline_daily) / baseline_daily * 100) if baseline_daily > 0 else 0
+    incremental_revenue = (post_daily - baseline_daily) * after_days if baseline_daily > 0 else 0
+    
+    return {
+        "baseline_daily": round(baseline_daily, 2),
+        "post_daily": round(post_daily, 2),
+        "lift_percent": round(lift_percent, 1),
+        "incremental_revenue": round(max(0, incremental_revenue), 2)
+    }
+
+
+def get_posts_with_impact(db: Session, business_id: int) -> List[Dict[str, Any]]:
+    posts = db.query(MediaPost).filter(
+        MediaPost.business_id == business_id
+    ).order_by(MediaPost.posted_at.desc()).all()
+    
+    if not posts:
+        return []
+    
+    products = db.query(Product).filter(Product.business_id == business_id).all()
+    product_ids = [p.id for p in products]
+    
+    result = []
+    for post in posts:
+        impact = calculate_post_impact(db, post, product_ids)
+        result.append({
+            "id": post.id,
+            "post_type": post.post_type,
+            "caption": post.caption or "",
+            "posted_at": post.posted_at.strftime("%Y-%m-%d"),
+            "impressions": post.impressions,
+            "likes": post.likes,
+            "comments": post.comments,
+            "shares": post.shares,
+            "engagement": post.likes + post.comments + post.shares,
+            "baseline_daily": impact["baseline_daily"],
+            "post_daily": impact["post_daily"],
+            "lift_percent": impact["lift_percent"],
+            "incremental_revenue": impact["incremental_revenue"]
+        })
+    
+    return result
+
+
+def get_media_type_comparison(db: Session, business_id: int) -> Dict[str, Any]:
+    posts = db.query(MediaPost).filter(MediaPost.business_id == business_id).all()
+    
+    if not posts:
+        return {"reels": {"count": 0, "avg_lift": 0, "avg_engagement": 0},
+                "stories": {"count": 0, "avg_lift": 0, "avg_engagement": 0}}
+    
+    products = db.query(Product).filter(Product.business_id == business_id).all()
+    product_ids = [p.id for p in products]
+    
+    reels = [p for p in posts if p.post_type == "reel"]
+    stories = [p for p in posts if p.post_type == "story"]
+    
+    def calc_avg(post_list):
+        if not post_list:
+            return {"count": 0, "avg_lift": 0, "avg_engagement": 0}
+        
+        total_lift = 0
+        total_engagement = 0
+        
+        for post in post_list:
+            impact = calculate_post_impact(db, post, product_ids)
+            total_lift += impact["lift_percent"]
+            total_engagement += post.likes + post.comments + post.shares
+        
+        return {
+            "count": len(post_list),
+            "avg_lift": round(total_lift / len(post_list), 1),
+            "avg_engagement": round(total_engagement / len(post_list), 1)
+        }
+    
+    return {
+        "reels": calc_avg(reels),
+        "stories": calc_avg(stories)
+    }
+
+
+def get_revenue_with_posts_timeline(db: Session, business_id: int, days: int = 30) -> Dict[str, Any]:
+    products = db.query(Product).filter(Product.business_id == business_id).all()
+    product_ids = [p.id for p in products]
+    
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=days)
+    
+    sales = db.query(Sale).filter(
+        Sale.product_id.in_(product_ids),
+        Sale.sale_date >= start_date
+    ).all()
+    
+    posts = db.query(MediaPost).filter(
+        MediaPost.business_id == business_id,
+        MediaPost.posted_at >= start_date
+    ).all()
+    
+    daily_revenue = {}
+    current = start_date
+    while current <= end_date:
+        daily_revenue[current.strftime("%Y-%m-%d")] = 0
+        current += timedelta(days=1)
+    
+    for sale in sales:
+        date_key = sale.sale_date.strftime("%Y-%m-%d")
+        if date_key in daily_revenue:
+            daily_revenue[date_key] += sale.total_amount
+    
+    revenue_data = [{"date": d, "revenue": round(r, 2)} for d, r in sorted(daily_revenue.items())]
+    
+    post_markers = [{
+        "date": p.posted_at.strftime("%Y-%m-%d"),
+        "type": p.post_type,
+        "caption": p.caption or ""
+    } for p in posts]
+    
+    return {
+        "revenue_data": revenue_data,
+        "post_markers": post_markers
+    }

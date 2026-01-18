@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from models import Product, Sale
+from models import Product, Sale, MediaPost
 from datetime import datetime, timedelta
 import random
 
@@ -67,6 +67,48 @@ def generate_demo_data(db: Session, business_id: int):
             current_date += timedelta(days=1)
     
     db.commit()
+    
+    media_posts_data = [
+        {"type": "reel", "caption": "Check out our new coffee brewing technique!", "days_ago": 85},
+        {"type": "story", "caption": "Fresh croissants just out of the oven", "days_ago": 78},
+        {"type": "reel", "caption": "Behind the scenes: How we source our organic beans", "days_ago": 70},
+        {"type": "story", "caption": "Morning rush hour vibes", "days_ago": 63},
+        {"type": "reel", "caption": "Customer testimonial: Best coffee in town!", "days_ago": 55},
+        {"type": "story", "caption": "New almond butter flavor dropping tomorrow", "days_ago": 48},
+        {"type": "reel", "caption": "Recipe: Perfect breakfast with our granola", "days_ago": 40},
+        {"type": "story", "caption": "Flash sale - 20% off all bakery items", "days_ago": 35},
+        {"type": "reel", "caption": "Meet our barista team", "days_ago": 28},
+        {"type": "story", "caption": "Weekend special menu preview", "days_ago": 21},
+        {"type": "reel", "caption": "How we make our fresh juice daily", "days_ago": 14},
+        {"type": "story", "caption": "Thank you for 1000 followers!", "days_ago": 7},
+        {"type": "reel", "caption": "New smoothie flavors for summer", "days_ago": 3},
+    ]
+    
+    for post_data in media_posts_data:
+        post_date = end_date - timedelta(days=post_data["days_ago"])
+        
+        is_reel = post_data["type"] == "reel"
+        base_impressions = random.randint(800, 5000) if is_reel else random.randint(200, 1500)
+        engagement_rate = random.uniform(0.05, 0.15)
+        
+        impressions = base_impressions
+        likes = int(impressions * engagement_rate * random.uniform(0.6, 1.0))
+        comments = int(impressions * engagement_rate * random.uniform(0.05, 0.15))
+        shares = int(impressions * engagement_rate * random.uniform(0.02, 0.08)) if is_reel else 0
+        
+        media_post = MediaPost(
+            business_id=business_id,
+            post_type=post_data["type"],
+            caption=post_data["caption"],
+            posted_at=post_date,
+            impressions=impressions,
+            likes=likes,
+            comments=comments,
+            shares=shares
+        )
+        db.add(media_post)
+    
+    db.commit()
     return True
 
 
@@ -77,4 +119,5 @@ def clear_demo_data(db: Session, business_id: int):
         db.query(Sale).filter(Sale.product_id == product.id).delete()
     
     db.query(Product).filter(Product.business_id == business_id).delete()
+    db.query(MediaPost).filter(MediaPost.business_id == business_id).delete()
     db.commit()

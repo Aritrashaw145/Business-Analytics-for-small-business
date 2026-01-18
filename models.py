@@ -23,6 +23,7 @@ class Business(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     products = relationship("Product", back_populates="business", cascade="all, delete-orphan")
+    media_posts = relationship("MediaPost", back_populates="business", cascade="all, delete-orphan")
 
 
 class Product(Base):
@@ -49,6 +50,22 @@ class Sale(Base):
     sale_date = Column(Date, nullable=False)
     
     product = relationship("Product", back_populates="sales")
+
+
+class MediaPost(Base):
+    __tablename__ = "media_posts"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    business_id = Column(Integer, ForeignKey("businesses.id"), nullable=False)
+    post_type = Column(String(20), nullable=False)  # 'reel' or 'story'
+    caption = Column(String(500))
+    posted_at = Column(Date, nullable=False)
+    impressions = Column(Integer, default=0)
+    likes = Column(Integer, default=0)
+    comments = Column(Integer, default=0)
+    shares = Column(Integer, default=0)
+    
+    business = relationship("Business", back_populates="media_posts")
 
 
 def init_db():
