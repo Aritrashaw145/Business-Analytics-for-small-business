@@ -1,0 +1,180 @@
+🔹 PROJECT OVERVIEW
+
+Build a full-stack data analytics application for small businesses, similar to Instagram Insights, where business owners can upload daily sales data and receive actionable insights such as:
+	•	Best-selling products
+	•	Most profitable products
+	•	Best day of the week for sales
+	•	Weekly & monthly sales trends
+	•	Low-performing products
+
+⸻
+
+🔹 TECH STACK (STRICT)
+
+Frontend (Mobile App)
+	•	Kotlin
+	•	Android (MVVM architecture)
+	•	Retrofit for API calls
+	•	Jetpack Compose for UI
+	•	MPAndroidChart for charts
+	•	Room DB for offline caching
+
+Backend
+	•	Spring Boot (Java)
+	•	Spring Data JPA
+	•	Spring Security + JWT
+	•	PostgreSQL
+	•	REST APIs
+	•	Lombok
+
+⸻
+
+🔹 CORE FEATURES
+
+1️⃣ Authentication
+	•	JWT-based login & signup
+	•	Each user represents one business
+	•	Secure API access
+
+⸻
+
+2️⃣ Data Models (Database)
+
+Create these entities:
+
+Business
+	•	id
+	•	name
+	•	ownerName
+	•	category
+	•	createdAt
+
+Product
+	•	id
+	•	businessId
+	•	name
+	•	costPrice
+	•	sellingPrice
+	•	category
+
+Sale
+	•	id
+	•	productId
+	•	quantity
+	•	totalAmount
+	•	saleDate
+
+⸻
+
+3️⃣ Backend Analytics APIs
+
+Implement REST APIs that return JSON data:
+	•	/analytics/best-products
+	•	/analytics/most-profitable
+	•	/analytics/best-day
+	•	/analytics/weekly-trends
+	•	/analytics/low-performing-products
+
+Each API must:
+	•	Use optimized JPQL / SQL queries
+	•	Return DTOs (not entities)
+	•	Be business-scoped (multi-tenant safe)
+
+⸻
+
+4️⃣ Business Logic Rules
+	•	Profit = (sellingPrice - costPrice) * quantity
+	•	Best product = highest quantity sold
+	•	Best day = highest total revenue
+	•	Low performer = lowest revenue in last 30 days
+
+⸻
+
+5️⃣ Android App UI (Compose)
+
+Create these screens:
+	1.	Login / Register
+	2.	Dashboard
+	•	Total Revenue
+	•	Total Profit
+	•	Orders Count
+	3.	Top Products Screen
+	•	Bar chart
+	4.	Best Day Screen
+	•	Highlight best weekday
+	5.	Trends Screen
+	•	Line chart (weekly/monthly)
+
+⸻
+
+6️⃣ Android Architecture Rules
+	•	Follow MVVM
+	•	Use:
+	•	Repository
+	•	ViewModel
+	•	StateFlow / LiveData
+	•	API errors handled gracefully
+	•	Loading & empty states implemented
+
+⸻
+
+🔹 API INTEGRATION
+	•	Retrofit service interfaces
+	•	Kotlin data classes for DTOs
+	•	Token stored securely
+	•	Base URL configurable
+
+⸻
+
+🔹 DATA VISUALIZATION
+
+Use MPAndroidChart:
+	•	Bar chart → Top products
+	•	Line chart → Sales trends
+	•	Pie chart → Revenue share per product
+
+⸻
+
+🔹 CODE QUALITY REQUIREMENTS
+	•	Clean, readable, modular code
+	•	Meaningful naming conventions
+	•	No hardcoded values
+	•	Comments where logic is non-trivial
+	•	DTO mapping layer required
+
+⸻
+
+🔹 BONUS (OPTIONAL)
+
+If time permits:
+	•	Add CSV upload for sales
+	•	Add date filters
+	•	Add export analytics as PDF
+
+⸻
+
+🔹 FINAL DELIVERABLES
+	•	Complete Spring Boot backend
+	•	Complete Kotlin Android app
+	•	Sample test data
+	•	API documentation (README)
+	•	Instructions to run locally
+
+⸻
+
+🔹 IMPORTANT CONSTRAINTS
+	•	Keep the app simple and beginner-friendly
+	•	No ML for now (rule-based analytics only)
+	•	Focus on clear insights, not complex math
+
+⸻
+
+🚀 EXPECTED OUTPUT
+
+Generate:
+	•	Backend project structure
+	•	Database schema
+	•	REST APIs
+	•	Android UI screens
+	•	ViewModels & repositories
+	•	Working demo data
