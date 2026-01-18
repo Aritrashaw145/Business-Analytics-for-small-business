@@ -427,6 +427,161 @@ def get_media_type_comparison(db: Session, business_id: int) -> Dict[str, Any]:
     }
 
 
+def get_business_recommendations(db: Session, business_id: int) -> Dict[str, Any]:
+    """Generate actionable business recommendations based on all available data"""
+    
+    products = db.query(Product).filter(Product.business_id == business_id).all()
+    product_ids = [p.id for p in products]
+    
+    if not product_ids:
+        return {
+            "status": "new_business",
+            "primary_action": "Add your products and start recording sales",
+            "recommendations": [
+                {"type": "setup", "priority": "high", "title": "Add Your Products", 
+                 "description": "Start by adding your products with cost and selling prices to track profitability.",
+                 "icon": "📦"},
+                {"type": "setup", "priority": "high", "title": "Record Your Sales", 
+                 "description": "Once products are added, record daily sales to get insights.",
+                 "icon": "💰"},
+                {"type": "growth", "priority": "medium", "title": "Create Social Media Content", 
+                 "description": "Post reels and stories to attract more customers.",
+                 "icon": "📱"}
+            ],
+            "health_score": 0,
+            "focus_area": "Getting Started"
+        }
+    
+    stats = get_dashboard_stats(db, business_id)
+    thirty_days_ago = datetime.now().date() - timedelta(days=30)
+    seven_days_ago = datetime.now().date() - timedelta(days=7)
+    
+    recent_sales = db.query(Sale).filter(
+        Sale.product_id.in_(product_ids),
+        Sale.sale_date >= thirty_days_ago
+    ).all()
+    
+    very_recent_sales = [s for s in recent_sales if s.sale_date >= seven_days_ago]
+    older_sales = [s for s in recent_sales if s.sale_date < seven_days_ago]
+    
+    recent_revenue = sum(s.total_amount for s in very_recent_sales)
+    older_revenue = sum(s.total_amount for s in older_sales)
+    
+    older_daily_avg = older_revenue / 23 if older_sales else 0
+    recent_daily_avg = recent_revenue / 7 if very_recent_sales else 0
+    
+    growth_trend = "growing" if recent_daily_avg > older_daily_avg * 1.1 else (
+        "declining" if recent_daily_avg < older_daily_avg * 0.9 else "stable"
+    )
+    
+    media_posts = db.query(MediaPost).filter(MediaPost.business_id == business_id).all()
+    recent_posts = [p for p in media_posts if p.posted_at >= seven_days_ago]
+    
+    recommendations = []
+    focus_area = "Business Growth"
+    health_score = 50
+    
+    if growth_trend == "declining":
+        health_score -= 20
+        focus_area = "Revenue Recovery"
+        recommendations.append({
+            "type": "urgent", "priority": "high", "title": "Launch a Promotion",
+            "description": "Sales are declining. Consider running a limited-time discount or special offer to boost revenue.",
+            "icon": "🎯"
+        })
+    elif growth_trend == "growing":
+        health_score += 20
+        recommendations.append({
+            "type": "growth", "priority": "medium", "title": "Scale What's Working",
+            "description": "Your sales are growing! Identify your best-selling products and stock up.",
+            "icon": "📈"
+        })
+    
+    low_performers = get_low_performing_products(db, business_id, 5)
+    if low_performers and low_performers[0]["revenue"] == 0:
+        recommendations.append({
+            "type": "action", "priority": "high", "title": "Review Underperforming Products",
+            "description": f"'{low_performers[0]['name']}' has no recent sales. Consider discounting or discontinuing.",
+            "icon": "⚠️"
+        })
+    
+    if not media_posts:
+        recommendations.append({
+            "type": "growth", "priority": "high", "title": "Start Posting on Social Media",
+            "description": "You have no media posts tracked. Reels and stories can significantly boost sales.",
+            "icon": "📱"
+        })
+    elif len(recent_posts) == 0:
+        recommendations.append({
+            "type": "action", "priority": "high", "title": "Post a New Reel or Story",
+            "description": "No posts in the last 7 days. Regular content keeps customers engaged.",
+            "icon": "🎬"
+        })
+    else:
+        health_score += 10
+    
+    if media_posts:
+        reels = [p for p in media_posts if p.post_type == "reel"]
+        stories = [p for p in media_posts if p.post_type == "story"]
+        
+        if len(reels) < len(stories) * 0.5:
+            recommendations.append({
+                "type": "growth", "priority": "medium", "title": "Create More Reels",
+                "description": "Reels typically get more reach than stories. Try posting more reels.",
+                "icon": "🎥"
+            })
+        elif len(stories) < len(reels) * 0.5:
+            recommendations.append({
+                "type": "growth", "priority": "medium", "title": "Post More Stories",
+                "description": "Stories keep your audience engaged daily. Try posting more frequently.",
+                "icon": "📸"
+            })
+    
+    best_day = get_best_day_of_week(db, business_id)
+    if best_day["day"] != "N/A":
+        recommendations.append({
+            "type": "insight", "priority": "low", "title": f"Focus on {best_day['day']}s",
+            "description": f"Your best day is {best_day['day']} with ${best_day['revenue']:,.0f} revenue. Plan special offers for this day.",
+            "icon": "📅"
+        })
+    
+    profitable = get_most_profitable_products(db, business_id, 1)
+    if profitable:
+        top_product = profitable[0]
+        recommendations.append({
+            "type": "insight", "priority": "medium", "title": f"Promote '{top_product['name']}'",
+            "description": f"Your most profitable product with {top_product['profit_margin']:.0f}% margin. Feature it prominently.",
+            "icon": "⭐"
+        })
+        health_score += 10
+    
+    if stats["total_products"] < 5:
+        recommendations.append({
+            "type": "growth", "priority": "medium", "title": "Expand Your Product Line",
+            "description": "You only have a few products. Adding more variety can attract different customers.",
+            "icon": "🛍️"
+        })
+    else:
+        health_score += 10
+    
+    health_score = min(100, max(0, health_score))
+    
+    recommendations.sort(key=lambda x: {"high": 0, "medium": 1, "low": 2}.get(x["priority"], 3))
+    
+    primary_action = recommendations[0]["description"] if recommendations else "Keep up the great work!"
+    
+    return {
+        "status": "active",
+        "primary_action": primary_action,
+        "recommendations": recommendations[:6],
+        "health_score": health_score,
+        "focus_area": focus_area,
+        "growth_trend": growth_trend,
+        "recent_daily_avg": round(recent_daily_avg, 2),
+        "posts_this_week": len(recent_posts)
+    }
+
+
 def get_revenue_with_posts_timeline(db: Session, business_id: int, days: int = 30) -> Dict[str, Any]:
     products = db.query(Product).filter(Product.business_id == business_id).all()
     product_ids = [p.id for p in products]

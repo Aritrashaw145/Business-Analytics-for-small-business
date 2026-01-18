@@ -38,11 +38,12 @@ A full-stack data analytics application for small businesses, similar to Instagr
 ## Features
 1. **Authentication**: Secure login/signup with password hashing
 2. **Dashboard**: Total revenue, profit, orders, product count with charts
-3. **Product Analytics**: Best sellers, most profitable, low performers
-4. **Best Day Analysis**: Identify highest revenue day of week
-5. **Trends**: Weekly and monthly sales trends with line charts
-6. **Media Impact Analysis**: Track reels/stories and measure their impact on sales
-7. **Data Management**: Add products, record sales, manage media posts, CSV import, demo data
+3. **Outcome Section**: Smart recommendations with health score, trends, and actionable insights
+4. **Product Analytics**: Best sellers, most profitable, low performers
+5. **Best Day Analysis**: Identify highest revenue day of week
+6. **Trends**: Weekly and monthly sales trends with line charts
+7. **Media Impact Analysis**: Track reels/stories and measure their impact on sales
+8. **Data Management**: User-friendly wizard for new users, easy product/sales entry, CSV import, demo data
 
 ## Analytics APIs (Functions)
 - `get_dashboard_stats()` - Summary metrics
@@ -56,6 +57,7 @@ A full-stack data analytics application for small businesses, similar to Instagr
 - `get_posts_with_impact()` - Individual post performance with sales correlation
 - `get_media_type_comparison()` - Reels vs Stories performance comparison
 - `get_revenue_with_posts_timeline()` - Revenue timeline with post markers
+- `get_business_recommendations()` - Smart recommendations with health score and action items
 
 ## Running the Application
 ```bash

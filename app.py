@@ -20,7 +20,8 @@ from analytics import (
     get_media_impact_stats,
     get_posts_with_impact,
     get_media_type_comparison,
-    get_revenue_with_posts_timeline
+    get_revenue_with_posts_timeline,
+    get_business_recommendations
 )
 from demo_data import generate_demo_data, clear_demo_data
 
@@ -226,6 +227,72 @@ def show_dashboard():
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("Not enough data for trends yet.")
+        
+        st.divider()
+        
+        st.markdown("## Outcome - What Should You Do Next?")
+        recommendations = get_business_recommendations(db, st.session_state.business_id)
+        
+        col1, col2, col3 = st.columns([1, 1, 1])
+        
+        with col1:
+            health_color = "#10b981" if recommendations["health_score"] >= 70 else (
+                "#f59e0b" if recommendations["health_score"] >= 40 else "#ef4444"
+            )
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, {health_color}22 0%, {health_color}11 100%); 
+                        padding: 20px; border-radius: 12px; border-left: 4px solid {health_color};">
+                <div style="font-size: 0.9rem; color: #666;">Business Health Score</div>
+                <div style="font-size: 2.5rem; font-weight: bold; color: {health_color};">{recommendations["health_score"]}/100</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            trend_icon = "📈" if recommendations.get("growth_trend") == "growing" else (
+                "📉" if recommendations.get("growth_trend") == "declining" else "➡️"
+            )
+            trend_text = recommendations.get("growth_trend", "N/A").capitalize()
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #667eea22 0%, #667eea11 100%); 
+                        padding: 20px; border-radius: 12px; border-left: 4px solid #667eea;">
+                <div style="font-size: 0.9rem; color: #666;">Sales Trend</div>
+                <div style="font-size: 2rem; font-weight: bold;">{trend_icon} {trend_text}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #8b5cf622 0%, #8b5cf611 100%); 
+                        padding: 20px; border-radius: 12px; border-left: 4px solid #8b5cf6;">
+                <div style="font-size: 0.9rem; color: #666;">Focus Area</div>
+                <div style="font-size: 1.5rem; font-weight: bold;">{recommendations["focus_area"]}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown("### Your Action Items")
+        
+        for i, rec in enumerate(recommendations["recommendations"]):
+            priority_color = "#ef4444" if rec["priority"] == "high" else (
+                "#f59e0b" if rec["priority"] == "medium" else "#10b981"
+            )
+            priority_label = "HIGH PRIORITY" if rec["priority"] == "high" else (
+                "MEDIUM" if rec["priority"] == "medium" else "LOW"
+            )
+            
+            st.markdown(f"""
+            <div style="background: white; padding: 16px; border-radius: 10px; margin-bottom: 12px; 
+                        border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 1.5rem;">{rec["icon"]}</span>
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; font-size: 1.1rem;">{rec["title"]}</div>
+                        <div style="color: #666; font-size: 0.95rem; margin-top: 4px;">{rec["description"]}</div>
+                    </div>
+                    <span style="background: {priority_color}22; color: {priority_color}; padding: 4px 12px; 
+                                 border-radius: 20px; font-size: 0.75rem; font-weight: 600;">{priority_label}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
             
     finally:
         db.close()
@@ -558,71 +625,168 @@ def show_data_management():
     try:
         st.title("Data Management")
         
-        tab1, tab2, tab3, tab4 = st.tabs(["Products", "Add Sale", "Media Posts", "Import Data"])
+        products = db.query(Product).filter(
+            Product.business_id == st.session_state.business_id
+        ).all()
+        
+        sales_count = 0
+        if products:
+            product_ids = [p.id for p in products]
+            sales_count = db.query(Sale).filter(Sale.product_id.in_(product_ids)).count()
+        
+        posts_count = db.query(MediaPost).filter(
+            MediaPost.business_id == st.session_state.business_id
+        ).count()
+        
+        if not products:
+            st.markdown("""
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                        padding: 30px; border-radius: 16px; color: white; text-align: center; margin-bottom: 24px;">
+                <h2 style="margin: 0 0 10px 0;">Welcome! Let's Get Started</h2>
+                <p style="margin: 0; opacity: 0.9;">Follow these simple steps to set up your business analytics</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.markdown("""
+                <div style="background: #f0fdf4; padding: 20px; border-radius: 12px; text-align: center; border: 2px solid #10b981;">
+                    <div style="font-size: 2rem;">1</div>
+                    <div style="font-weight: 600; margin: 8px 0;">Add Products</div>
+                    <div style="color: #666; font-size: 0.9rem;">Enter your products with prices</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with col2:
+                st.markdown("""
+                <div style="background: #fef3c7; padding: 20px; border-radius: 12px; text-align: center; border: 2px dashed #f59e0b;">
+                    <div style="font-size: 2rem;">2</div>
+                    <div style="font-weight: 600; margin: 8px 0;">Record Sales</div>
+                    <div style="color: #666; font-size: 0.9rem;">Log your daily sales</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with col3:
+                st.markdown("""
+                <div style="background: #ede9fe; padding: 20px; border-radius: 12px; text-align: center; border: 2px dashed #8b5cf6;">
+                    <div style="font-size: 2rem;">3</div>
+                    <div style="font-weight: 600; margin: 8px 0;">View Insights</div>
+                    <div style="color: #666; font-size: 0.9rem;">See analytics and recommendations</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.info("Want to explore the app first? Load demo data to see how everything works.")
+            with col2:
+                if st.button("Load Demo Data to Explore", use_container_width=True, type="primary"):
+                    if generate_demo_data(db, st.session_state.business_id):
+                        st.success("Demo data loaded! Go to Dashboard to see your insights.")
+                        st.rerun()
+            
+            st.divider()
+        else:
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Products", len(products))
+            with col2:
+                st.metric("Sales Recorded", sales_count)
+            with col3:
+                st.metric("Media Posts", posts_count)
+            with col4:
+                progress = min(100, (len(products) * 20) + (min(sales_count, 10) * 5) + (posts_count * 5))
+                st.metric("Data Completeness", f"{progress}%")
+            
+            st.divider()
+        
+        tab1, tab2, tab3, tab4 = st.tabs(["Add Products", "Record Sales", "Media Posts", "Import / Demo"])
         
         with tab1:
-            st.subheader("Your Products")
+            st.subheader("Add Your Products")
+            st.markdown("Enter the products you sell with their costs and prices.")
             
-            with st.expander("Add New Product"):
-                with st.form("add_product"):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        name = st.text_input("Product Name")
-                        category = st.selectbox("Category", 
-                            ["Beverages", "Bakery", "Pantry", "Breakfast", "Snacks", "Other"])
-                    with col2:
-                        cost_price = st.number_input("Cost Price ($)", min_value=0.01, step=0.01)
-                        selling_price = st.number_input("Selling Price ($)", min_value=0.01, step=0.01)
-                    
-                    if st.form_submit_button("Add Product"):
-                        if name and cost_price > 0 and selling_price > 0:
-                            product = Product(
-                                business_id=st.session_state.business_id,
-                                name=name,
-                                cost_price=cost_price,
-                                selling_price=selling_price,
-                                category=category
-                            )
-                            db.add(product)
-                            db.commit()
-                            st.success(f"Product '{name}' added successfully!")
-                            st.rerun()
-                        else:
-                            st.error("Please fill in all fields correctly")
+            with st.form("add_product", clear_on_submit=True):
+                st.markdown("**New Product Details**")
+                col1, col2, col3 = st.columns([2, 1, 1])
+                with col1:
+                    name = st.text_input("Product Name", placeholder="e.g., Coffee Latte")
+                with col2:
+                    cost_price = st.number_input("Cost Price ($)", min_value=0.01, step=0.01, value=1.00)
+                with col3:
+                    selling_price = st.number_input("Selling Price ($)", min_value=0.01, step=0.01, value=2.00)
+                
+                col1, col2 = st.columns([1, 1])
+                with col1:
+                    category = st.selectbox("Category", 
+                        ["Beverages", "Bakery", "Pantry", "Breakfast", "Snacks", "Other"])
+                with col2:
+                    margin = ((selling_price - cost_price) / selling_price * 100) if selling_price > 0 else 0
+                    st.markdown(f"**Profit Margin: {margin:.1f}%**")
+                
+                submitted = st.form_submit_button("Add Product", use_container_width=True, type="primary")
+                
+                if submitted:
+                    if name and cost_price > 0 and selling_price > 0:
+                        product = Product(
+                            business_id=st.session_state.business_id,
+                            name=name,
+                            cost_price=cost_price,
+                            selling_price=selling_price,
+                            category=category
+                        )
+                        db.add(product)
+                        db.commit()
+                        st.success(f"Product '{name}' added successfully!")
+                        st.rerun()
+                    else:
+                        st.error("Please enter a product name")
             
-            products = db.query(Product).filter(
+            current_products = db.query(Product).filter(
                 Product.business_id == st.session_state.business_id
             ).all()
             
-            if products:
+            if current_products:
+                st.markdown("---")
+                st.markdown(f"**Your Products ({len(current_products)})**")
                 product_data = [{
-                    "ID": p.id,
                     "Name": p.name,
                     "Category": p.category,
-                    "Cost Price": f"${p.cost_price:.2f}",
-                    "Selling Price": f"${p.selling_price:.2f}",
+                    "Cost": f"${p.cost_price:.2f}",
+                    "Price": f"${p.selling_price:.2f}",
                     "Margin": f"{((p.selling_price - p.cost_price) / p.selling_price * 100):.1f}%"
-                } for p in products]
+                } for p in current_products]
                 st.dataframe(pd.DataFrame(product_data), use_container_width=True, hide_index=True)
             else:
-                st.info("No products added yet.")
+                st.info("No products added yet. Add your first product above!")
         
         with tab2:
-            st.subheader("Record a Sale")
+            st.subheader("Record Your Sales")
+            st.markdown("Log sales as they happen or at the end of each day.")
             
-            products = db.query(Product).filter(
+            all_products = db.query(Product).filter(
                 Product.business_id == st.session_state.business_id
             ).all()
             
-            if products:
-                with st.form("add_sale"):
-                    product_options = {p.name: p.id for p in products}
-                    selected_product = st.selectbox("Product", list(product_options.keys()))
-                    quantity = st.number_input("Quantity", min_value=1, value=1)
-                    sale_date = st.date_input("Sale Date", value=datetime.now().date())
+            if all_products:
+                with st.form("add_sale", clear_on_submit=True):
+                    col1, col2, col3 = st.columns([2, 1, 1])
+                    with col1:
+                        product_options = {p.name: p for p in all_products}
+                        selected_product = st.selectbox("Select Product", list(product_options.keys()))
+                    with col2:
+                        quantity = st.number_input("Quantity Sold", min_value=1, value=1)
+                    with col3:
+                        sale_date = st.date_input("Date", value=datetime.now().date())
                     
-                    if st.form_submit_button("Record Sale"):
-                        product = next(p for p in products if p.name == selected_product)
+                    selected = product_options.get(selected_product)
+                    if selected:
+                        estimated_total = quantity * selected.selling_price
+                        st.markdown(f"**Total: ${estimated_total:.2f}** (${selected.selling_price:.2f} x {quantity})")
+                    
+                    submitted = st.form_submit_button("Record Sale", use_container_width=True, type="primary")
+                    
+                    if submitted:
+                        product = product_options[selected_product]
                         total_amount = quantity * product.selling_price
                         
                         sale = Sale(
@@ -633,10 +797,30 @@ def show_data_management():
                         )
                         db.add(sale)
                         db.commit()
-                        st.success(f"Sale recorded: {quantity}x {selected_product} = ${total_amount:.2f}")
+                        st.success(f"Recorded: {quantity}x {selected_product} = ${total_amount:.2f}")
                         st.rerun()
+                
+                product_ids = [p.id for p in all_products]
+                recent_sales = db.query(Sale).filter(
+                    Sale.product_id.in_(product_ids)
+                ).order_by(Sale.sale_date.desc()).limit(10).all()
+                
+                if recent_sales:
+                    st.markdown("---")
+                    st.markdown("**Recent Sales (Last 10)**")
+                    sales_data = []
+                    for s in recent_sales:
+                        prod = next((p for p in all_products if p.id == s.product_id), None)
+                        if prod:
+                            sales_data.append({
+                                "Date": s.sale_date.strftime("%Y-%m-%d"),
+                                "Product": prod.name,
+                                "Qty": s.quantity,
+                                "Total": f"${s.total_amount:.2f}"
+                            })
+                    st.dataframe(pd.DataFrame(sales_data), use_container_width=True, hide_index=True)
             else:
-                st.warning("Please add products first before recording sales.")
+                st.warning("Add products first before recording sales. Go to the 'Add Products' tab.")
         
         with tab3:
             st.subheader("Media Posts")
@@ -696,73 +880,85 @@ def show_data_management():
                 st.info("No media posts added yet. Add posts to track their impact on sales.")
         
         with tab4:
-            st.subheader("Import Sales Data (CSV)")
-            
-            st.markdown("""
-            Upload a CSV file with the following columns:
-            - `product_name`: Name of the product
-            - `quantity`: Number of units sold
-            - `sale_date`: Date of sale (YYYY-MM-DD format)
-            """)
-            
-            uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
-            
-            if uploaded_file is not None:
-                try:
-                    df = pd.read_csv(uploaded_file)
-                    st.dataframe(df.head(), use_container_width=True)
-                    
-                    if st.button("Import Sales"):
-                        products = db.query(Product).filter(
-                            Product.business_id == st.session_state.business_id
-                        ).all()
-                        product_map = {p.name.lower(): p for p in products}
-                        
-                        imported = 0
-                        errors = 0
-                        
-                        for _, row in df.iterrows():
-                            product_name = str(row.get('product_name', '')).lower()
-                            if product_name in product_map:
-                                product = product_map[product_name]
-                                quantity = int(row.get('quantity', 1))
-                                sale_date = pd.to_datetime(row.get('sale_date')).date()
-                                
-                                sale = Sale(
-                                    product_id=product.id,
-                                    quantity=quantity,
-                                    total_amount=quantity * product.selling_price,
-                                    sale_date=sale_date
-                                )
-                                db.add(sale)
-                                imported += 1
-                            else:
-                                errors += 1
-                        
-                        db.commit()
-                        st.success(f"Imported {imported} sales. {errors} rows skipped (product not found).")
-                        
-                except Exception as e:
-                    st.error(f"Error processing file: {str(e)}")
-            
-            st.divider()
-            
-            st.subheader("Demo Data")
             col1, col2 = st.columns(2)
             
             with col1:
-                if st.button("Load Demo Data", use_container_width=True):
+                st.subheader("Quick Start")
+                st.markdown("Try the app with sample data to explore all features.")
+                
+                st.markdown("""
+                <div style="background: #f0fdf4; padding: 16px; border-radius: 10px; margin-bottom: 16px;">
+                    <div style="font-weight: 600;">Demo data includes:</div>
+                    <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+                        <li>12 sample products</li>
+                        <li>90 days of sales data</li>
+                        <li>13 social media posts</li>
+                    </ul>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if st.button("Load Demo Data", use_container_width=True, type="primary"):
                     if generate_demo_data(db, st.session_state.business_id):
-                        st.success("Demo data loaded successfully!")
+                        st.success("Demo data loaded! Go to Dashboard to see insights.")
                         st.rerun()
                     else:
-                        st.warning("Demo data already exists for this account.")
-            
-            with col2:
+                        st.warning("Demo data already exists.")
+                
                 if st.button("Clear All Data", use_container_width=True, type="secondary"):
                     clear_demo_data(db, st.session_state.business_id)
                     st.success("All data cleared.")
                     st.rerun()
+            
+            with col2:
+                st.subheader("Import from CSV")
+                st.markdown("Upload sales data from your existing records.")
+                
+                st.markdown("""
+                **Required columns:**
+                - `product_name` - Must match your product names
+                - `quantity` - Number sold
+                - `sale_date` - YYYY-MM-DD format
+                """)
+                
+                uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+                
+                if uploaded_file is not None:
+                    try:
+                        df = pd.read_csv(uploaded_file)
+                        st.dataframe(df.head(5), use_container_width=True)
+                        
+                        if st.button("Import Sales", use_container_width=True):
+                            import_products = db.query(Product).filter(
+                                Product.business_id == st.session_state.business_id
+                            ).all()
+                            product_map = {p.name.lower(): p for p in import_products}
+                            
+                            imported = 0
+                            errors = 0
+                            
+                            for _, row in df.iterrows():
+                                product_name = str(row.get('product_name', '')).lower()
+                                if product_name in product_map:
+                                    product = product_map[product_name]
+                                    quantity = int(row.get('quantity', 1))
+                                    sale_date = pd.to_datetime(row.get('sale_date')).date()
+                                    
+                                    sale = Sale(
+                                        product_id=product.id,
+                                        quantity=quantity,
+                                        total_amount=quantity * product.selling_price,
+                                        sale_date=sale_date
+                                    )
+                                    db.add(sale)
+                                    imported += 1
+                                else:
+                                    errors += 1
+                            
+                            db.commit()
+                            st.success(f"Imported {imported} sales. {errors} skipped.")
+                            
+                    except Exception as e:
+                        st.error(f"Error: {str(e)}")
                     
     finally:
         db.close()
