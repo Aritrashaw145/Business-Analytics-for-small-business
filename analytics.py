@@ -541,7 +541,7 @@ def get_business_recommendations(db: Session, business_id: int) -> Dict[str, Any
     if best_day["day"] != "N/A":
         recommendations.append({
             "type": "insight", "priority": "low", "title": f"Focus on {best_day['day']}s",
-            "description": f"Your best day is {best_day['day']} with ${best_day['revenue']:,.0f} revenue. Plan special offers for this day.",
+            "description": f"Your best day is {best_day['day']} with ₹{best_day['revenue']:,.0f} revenue. Plan special offers for this day.",
             "icon": "📅"
         })
     
