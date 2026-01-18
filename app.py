@@ -230,69 +230,51 @@ def show_dashboard():
         
         st.divider()
         
-        st.markdown("## Outcome - What Should You Do Next?")
         recommendations = get_business_recommendations(db, st.session_state.business_id)
         
-        col1, col2, col3 = st.columns([1, 1, 1])
+        health_color = "#10b981" if recommendations["health_score"] >= 70 else (
+            "#f59e0b" if recommendations["health_score"] >= 40 else "#ef4444"
+        )
+        trend_icon = "📈" if recommendations.get("growth_trend") == "growing" else (
+            "📉" if recommendations.get("growth_trend") == "declining" else "➡️"
+        )
         
-        with col1:
-            health_color = "#10b981" if recommendations["health_score"] >= 70 else (
-                "#f59e0b" if recommendations["health_score"] >= 40 else "#ef4444"
-            )
+        with st.expander("OUTCOME - Click to See Your Action Items", expanded=False):
             st.markdown(f"""
-            <div style="background: linear-gradient(135deg, {health_color}22 0%, {health_color}11 100%); 
-                        padding: 20px; border-radius: 12px; border-left: 4px solid {health_color};">
-                <div style="font-size: 0.9rem; color: #666;">Business Health Score</div>
-                <div style="font-size: 2.5rem; font-weight: bold; color: {health_color};">{recommendations["health_score"]}/100</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col2:
-            trend_icon = "📈" if recommendations.get("growth_trend") == "growing" else (
-                "📉" if recommendations.get("growth_trend") == "declining" else "➡️"
-            )
-            trend_text = recommendations.get("growth_trend", "N/A").capitalize()
-            st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #667eea22 0%, #667eea11 100%); 
-                        padding: 20px; border-radius: 12px; border-left: 4px solid #667eea;">
-                <div style="font-size: 0.9rem; color: #666;">Sales Trend</div>
-                <div style="font-size: 2rem; font-weight: bold;">{trend_icon} {trend_text}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col3:
-            st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #8b5cf622 0%, #8b5cf611 100%); 
-                        padding: 20px; border-radius: 12px; border-left: 4px solid #8b5cf6;">
-                <div style="font-size: 0.9rem; color: #666;">Focus Area</div>
-                <div style="font-size: 1.5rem; font-weight: bold;">{recommendations["focus_area"]}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        st.markdown("### Your Action Items")
-        
-        for i, rec in enumerate(recommendations["recommendations"]):
-            priority_color = "#ef4444" if rec["priority"] == "high" else (
-                "#f59e0b" if rec["priority"] == "medium" else "#10b981"
-            )
-            priority_label = "HIGH PRIORITY" if rec["priority"] == "high" else (
-                "MEDIUM" if rec["priority"] == "medium" else "LOW"
-            )
-            
-            st.markdown(f"""
-            <div style="background: white; padding: 16px; border-radius: 10px; margin-bottom: 12px; 
-                        border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 1.5rem;">{rec["icon"]}</span>
-                    <div style="flex: 1;">
-                        <div style="font-weight: 600; font-size: 1.1rem;">{rec["title"]}</div>
-                        <div style="color: #666; font-size: 0.95rem; margin-top: 4px;">{rec["description"]}</div>
-                    </div>
-                    <span style="background: {priority_color}22; color: {priority_color}; padding: 4px 12px; 
-                                 border-radius: 20px; font-size: 0.75rem; font-weight: 600;">{priority_label}</span>
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                        padding: 20px; border-radius: 12px; color: white; text-align: center; margin-bottom: 20px;">
+                <div style="font-size: 1.2rem; margin-bottom: 8px;">Business Health Score</div>
+                <div style="font-size: 3rem; font-weight: bold;">{recommendations["health_score"]}/100</div>
+                <div style="font-size: 1rem; opacity: 0.9; margin-top: 8px;">
+                    {trend_icon} Sales {recommendations.get("growth_trend", "stable").capitalize()} | Focus: {recommendations["focus_area"]}
                 </div>
             </div>
             """, unsafe_allow_html=True)
+            
+            st.markdown("### What You Should Do Next")
+            
+            for rec in recommendations["recommendations"]:
+                priority_color = "#ef4444" if rec["priority"] == "high" else (
+                    "#f59e0b" if rec["priority"] == "medium" else "#10b981"
+                )
+                priority_label = "HIGH PRIORITY" if rec["priority"] == "high" else (
+                    "MEDIUM" if rec["priority"] == "medium" else "LOW"
+                )
+                
+                st.markdown(f"""
+                <div style="background: white; padding: 16px; border-radius: 10px; margin-bottom: 12px; 
+                            border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 1.5rem;">{rec["icon"]}</span>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; font-size: 1.1rem;">{rec["title"]}</div>
+                            <div style="color: #666; font-size: 0.95rem; margin-top: 4px;">{rec["description"]}</div>
+                        </div>
+                        <span style="background: {priority_color}22; color: {priority_color}; padding: 4px 12px; 
+                                     border-radius: 20px; font-size: 0.75rem; font-weight: 600;">{priority_label}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
             
     finally:
         db.close()
