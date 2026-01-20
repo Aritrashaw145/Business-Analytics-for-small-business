@@ -25,6 +25,9 @@
 
 # 📊 Business Analytics for Small Business
 
+🌐 **Live App:**  
+👉 https://aritrashaw145-business-analytics-for-small-business-app-8cabz4.streamlit.app/
+
 A simple, powerful analytics platform built to help **small businesses** understand their sales, products, and the **real impact of social media on revenue** — not just likes or views.
 
 This project focuses on **actionable business insights**, answering questions like:
