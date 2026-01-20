@@ -1176,19 +1176,26 @@ def show_data_management():
             if st.session_state.import_step == 1:
                 st.markdown("### Step 1: Import Products")
                 st.markdown("""
-                <div style="background: #eff6ff; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
-                    <strong>Required Columns:</strong>
-                    <table style="width: 100%; margin-top: 8px;">
-                        <tr><td><code>name</code></td><td>Product name (e.g., Masala Chai)</td></tr>
-                        <tr><td><code>cost_price</code></td><td>Your cost in ₹ (e.g., 15)</td></tr>
-                        <tr><td><code>selling_price</code></td><td>Selling price in ₹ (e.g., 30)</td></tr>
-                    </table>
-                    <strong style="margin-top: 8px; display: block;">Optional:</strong>
-                    <table style="width: 100%; margin-top: 8px;">
-                        <tr><td><code>category</code></td><td>Product category (e.g., Beverages)</td></tr>
-                    </table>
-                </div>
-                """, unsafe_allow_html=True)
+<div style="
+    background: linear-gradient(135deg, #1e293b, #0f172a);
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    color: #e5e7eb;
+    border: 1px solid #334155;
+">
+    <strong>Required Columns:</strong>
+    <table style="width: 100%; margin-top: 8px; color: #e5e7eb;">
+        <tr><td><code>name</code></td><td>Product name (e.g., Masala Chai)</td></tr>
+        <tr><td><code>cost_price</code></td><td>Your cost in ₹ (e.g., 15)</td></tr>
+        <tr><td><code>selling_price</code></td><td>Selling price in ₹ (e.g., 30)</td></tr>
+    </table>
+    <strong style="margin-top: 8px; display: block;">Optional:</strong>
+    <table style="width: 100%; margin-top: 8px; color: #e5e7eb;">
+        <tr><td><code>category</code></td><td>Product category (e.g., Beverages)</td></tr>
+    </table>
+</div>
+""", unsafe_allow_html=True)
                 
                 st.markdown("**Example CSV:**")
                 st.code("name,cost_price,selling_price,category\nMasala Chai,15,30,Beverages\nSamosa,8,20,Snacks", language="csv")
@@ -1227,7 +1234,7 @@ def show_data_management():
                 st.warning("Make sure you have imported Products first! Product names must match exactly.")
                 
                 st.markdown("""
-                <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+                <div style="background: linear-gradient(135deg, #1e293b, #0f172a); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
                     <strong>Required Columns:</strong>
                     <table style="width: 100%; margin-top: 8px;">
                         <tr><td><code>product_name</code></td><td>Must match your product names exactly</td></tr>
@@ -1293,7 +1300,7 @@ def show_data_management():
                 st.markdown("Import your social media posts to get AI-powered posting recommendations.")
                 
                 st.markdown("""
-                <div style="background: #fef3c7; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+                <div style="background: linear-gradient(135deg, #1e293b, #0f172a); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
                     <strong>Required Columns:</strong>
                     <table style="width: 100%; margin-top: 8px;">
                         <tr><td><code>post_type</code></td><td>reel, story, or image</td></tr>
