@@ -622,3 +622,126 @@ def get_revenue_with_posts_timeline(db: Session, business_id: int, days: int = 3
         "revenue_data": revenue_data,
         "post_markers": post_markers
     }
+
+
+def get_sales_by_day_hour(db: Session, business_id: int) -> Dict[str, Any]:
+    """Aggregate sales by day of week and hour for ML feature engineering"""
+    products = db.query(Product).filter(Product.business_id == business_id).all()
+    product_ids = [p.id for p in products]
+    
+    if not product_ids:
+        return {"by_day": {}, "by_hour": {}}
+    
+    sales = db.query(Sale).filter(Sale.product_id.in_(product_ids)).all()
+    
+    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    by_day = {day: {"revenue": 0, "count": 0} for day in day_names}
+    by_hour = {h: {"revenue": 0, "count": 0} for h in range(24)}
+    
+    for sale in sales:
+        day_idx = sale.sale_date.weekday()
+        by_day[day_names[day_idx]]["revenue"] += sale.total_amount
+        by_day[day_names[day_idx]]["count"] += 1
+        
+        if sale.sale_time:
+            hour = sale.sale_time.hour
+            by_hour[hour]["revenue"] += sale.total_amount
+            by_hour[hour]["count"] += 1
+    
+    return {
+        "by_day": [{"day": d, "revenue": round(v["revenue"], 2), "orders": v["count"]} 
+                   for d, v in by_day.items()],
+        "by_hour": [{"hour": h, "revenue": round(v["revenue"], 2), "orders": v["count"]} 
+                    for h, v in by_hour.items() if v["count"] > 0]
+    }
+
+
+def get_rolling_revenue_averages(db: Session, business_id: int) -> Dict[str, Any]:
+    """Calculate rolling 3-day and 7-day revenue averages"""
+    products = db.query(Product).filter(Product.business_id == business_id).all()
+    product_ids = [p.id for p in products]
+    
+    if not product_ids:
+        return {"avg_3d": 0, "avg_7d": 0, "avg_30d": 0}
+    
+    today = datetime.now().date()
+    
+    sales_3d = db.query(func.sum(Sale.total_amount)).filter(
+        Sale.product_id.in_(product_ids),
+        Sale.sale_date >= today - timedelta(days=3)
+    ).scalar() or 0
+    
+    sales_7d = db.query(func.sum(Sale.total_amount)).filter(
+        Sale.product_id.in_(product_ids),
+        Sale.sale_date >= today - timedelta(days=7)
+    ).scalar() or 0
+    
+    sales_30d = db.query(func.sum(Sale.total_amount)).filter(
+        Sale.product_id.in_(product_ids),
+        Sale.sale_date >= today - timedelta(days=30)
+    ).scalar() or 0
+    
+    return {
+        "avg_3d": round(sales_3d / 3, 2) if sales_3d else 0,
+        "avg_7d": round(sales_7d / 7, 2) if sales_7d else 0,
+        "avg_30d": round(sales_30d / 30, 2) if sales_30d else 0
+    }
+
+
+def get_post_timing_analysis(db: Session, business_id: int) -> Dict[str, Any]:
+    """Analyze posting times and their sales impact"""
+    posts = db.query(MediaPost).filter(MediaPost.business_id == business_id).all()
+    
+    if not posts:
+        return {"analysis": [], "best_time": None, "best_day": None}
+    
+    products = db.query(Product).filter(Product.business_id == business_id).all()
+    product_ids = [p.id for p in products]
+    
+    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    time_buckets = {"morning": (6, 12), "afternoon": (12, 17), "evening": (17, 22)}
+    
+    analysis = []
+    for post in posts:
+        impact = calculate_post_impact(db, post, product_ids)
+        
+        time_bucket = "evening"
+        if post.post_time:
+            hour = post.post_time.hour
+            if 6 <= hour < 12:
+                time_bucket = "morning"
+            elif 12 <= hour < 17:
+                time_bucket = "afternoon"
+            else:
+                time_bucket = "evening"
+        
+        analysis.append({
+            "day": day_names[post.posted_at.weekday()],
+            "time_bucket": time_bucket,
+            "post_type": post.post_type,
+            "lift_percent": impact["lift_percent"]
+        })
+    
+    day_lifts = {}
+    for a in analysis:
+        if a["day"] not in day_lifts:
+            day_lifts[a["day"]] = []
+        day_lifts[a["day"]].append(a["lift_percent"])
+    
+    best_day = max(day_lifts.items(), key=lambda x: sum(x[1])/len(x[1]) if x[1] else 0)[0] if day_lifts else None
+    
+    time_lifts = {}
+    for a in analysis:
+        if a["time_bucket"] not in time_lifts:
+            time_lifts[a["time_bucket"]] = []
+        time_lifts[a["time_bucket"]].append(a["lift_percent"])
+    
+    best_time = max(time_lifts.items(), key=lambda x: sum(x[1])/len(x[1]) if x[1] else 0)[0] if time_lifts else None
+    
+    return {
+        "analysis": analysis,
+        "best_day": best_day,
+        "best_time": best_time,
+        "day_summary": {d: round(sum(l)/len(l), 1) if l else 0 for d, l in day_lifts.items()},
+        "time_summary": {t: round(sum(l)/len(l), 1) if l else 0 for t, l in time_lifts.items()}
+    }

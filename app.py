@@ -21,9 +21,15 @@ from analytics import (
     get_posts_with_impact,
     get_media_type_comparison,
     get_revenue_with_posts_timeline,
-    get_business_recommendations
+    get_business_recommendations,
+    get_post_timing_analysis
 )
 from demo_data import generate_demo_data, clear_demo_data
+from ml_engine import (
+    get_best_posting_recommendation,
+    get_posting_insights,
+    train_post_impact_model
+)
 
 init_db()
 
@@ -602,6 +608,188 @@ def show_media_impact():
         db.close()
 
 
+def show_post_recommendations():
+    db = SessionLocal()
+    try:
+        st.title("Post Recommendations")
+        st.markdown("Get data-driven recommendations for when to post based on **sales impact**, not just engagement.")
+        
+        recommendation = get_best_posting_recommendation(db, st.session_state.business_id)
+        
+        if recommendation.get("error"):
+            st.warning(recommendation.get("message", "Add more posts and sales data to get personalized recommendations."))
+            
+            st.markdown("""
+            ### How This Works
+            
+            Unlike typical social media analytics that focus on likes and engagement, 
+            this feature analyzes your **actual sales data** to find:
+            
+            - **Best Day**: Which day of the week leads to highest sales after posting
+            - **Best Time**: Morning, afternoon, or evening - when posting drives the most revenue
+            - **Best Content Type**: Whether reels, stories, or images generate more sales
+            
+            **To get started:**
+            1. Add at least 3 media posts in Data Management
+            2. Record sales for at least 30 days
+            3. Come back to see personalized recommendations
+            """)
+        else:
+            best = recommendation.get("best_overall", {})
+            
+            post_type = best.get('post_type', 'reel')
+            day = best.get('day', 'Friday')
+            uplift = best.get('expected_uplift_percent', 0)
+            
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                        padding: 24px; border-radius: 16px; color: white; margin-bottom: 24px;">
+                <div style="font-size: 1.1rem; opacity: 0.9; margin-bottom: 8px;">AI Recommendation</div>
+                <div style="font-size: 1.6rem; font-weight: bold; margin-bottom: 12px;">
+                    If you post a {post_type} on {day} evening, your sales are likely to increase by ~{uplift:.0f}%
+                </div>
+                <div style="font-size: 1rem; opacity: 0.9; margin-top: 8px;">
+                    Confidence: {best.get('confidence', 'medium').capitalize()} | Based on your actual sales data
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.markdown("""
+                <div style="background: #f0fdf4; padding: 20px; border-radius: 12px; text-align: center; border: 2px solid #10b981;">
+                    <div style="font-size: 0.9rem; color: #666;">Best Day</div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #10b981;">{}</div>
+                </div>
+                """.format(recommendation.get('best_day', 'Friday')), unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown("""
+                <div style="background: #eff6ff; padding: 20px; border-radius: 12px; text-align: center; border: 2px solid #3b82f6;">
+                    <div style="font-size: 0.9rem; color: #666;">Best Time</div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #3b82f6;">{}</div>
+                </div>
+                """.format(recommendation.get('best_time', 'Evening')), unsafe_allow_html=True)
+            
+            with col3:
+                st.markdown("""
+                <div style="background: #fef3c7; padding: 20px; border-radius: 12px; text-align: center; border: 2px solid #f59e0b;">
+                    <div style="font-size: 0.9rem; color: #666;">Best Content Type</div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #f59e0b;">{}</div>
+                </div>
+                """.format(recommendation.get('best_post_type', 'Reel').capitalize()), unsafe_allow_html=True)
+            
+            st.divider()
+            
+            st.subheader("Top 5 Posting Scenarios")
+            st.markdown("Ranked by expected sales impact")
+            
+            top_scenarios = recommendation.get("top_5_scenarios", [])
+            if top_scenarios:
+                scenario_data = []
+                for i, s in enumerate(top_scenarios, 1):
+                    scenario_data.append({
+                        "Rank": i,
+                        "Day": s["day"],
+                        "Post Type": s["post_type"].capitalize(),
+                        "Expected Uplift": f"+{s['uplift_percent']:.1f}%",
+                        "Expected Revenue": f"₹{s['expected_revenue']:,.0f}",
+                        "Confidence": s.get("confidence", "medium").capitalize()
+                    })
+                
+                st.dataframe(pd.DataFrame(scenario_data), use_container_width=True, hide_index=True)
+            
+            st.divider()
+            
+            insights = get_posting_insights(db, st.session_state.business_id)
+            
+            if insights.get("has_data"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.subheader("Performance by Day")
+                    day_data = insights.get("day_performance", [])
+                    if day_data:
+                        df = pd.DataFrame(day_data)
+                        fig = px.bar(
+                            df,
+                            x="day",
+                            y="avg_lift",
+                            color="avg_lift",
+                            color_continuous_scale="RdYlGn",
+                            title="Average Sales Lift by Day"
+                        )
+                        fig.update_layout(xaxis_title="Day", yaxis_title="Avg Sales Lift %")
+                        st.plotly_chart(fig, use_container_width=True)
+                
+                with col2:
+                    st.subheader("Performance by Content Type")
+                    type_data = insights.get("type_performance", [])
+                    if type_data:
+                        df = pd.DataFrame(type_data)
+                        fig = px.bar(
+                            df,
+                            x="type",
+                            y="avg_lift",
+                            color="type",
+                            color_discrete_map={"reel": "#667eea", "story": "#feca57", "image": "#10b981"},
+                            title="Average Sales Lift by Content Type"
+                        )
+                        fig.update_layout(xaxis_title="Content Type", yaxis_title="Avg Sales Lift %")
+                        st.plotly_chart(fig, use_container_width=True)
+            
+            st.divider()
+            
+            with st.expander("Train ML Model for Better Predictions"):
+                st.markdown("""
+                Train a machine learning model on your data for more accurate predictions.
+                The model learns from your specific sales patterns and posting history.
+                """)
+                
+                if st.button("Train Model", type="primary"):
+                    with st.spinner("Training model..."):
+                        result = train_post_impact_model(db, st.session_state.business_id)
+                        
+                        if result.get("success"):
+                            st.success(f"Model trained successfully!")
+                            st.markdown(f"""
+                            **Model Performance:**
+                            - R² Score: {result.get('r2', 0):.3f} (higher is better, max 1.0)
+                            - Mean Absolute Error: ₹{result.get('mae', 0):,.2f}
+                            - Data points used: {result.get('data_points', 0)}
+                            
+                            **Top Features:**
+                            """)
+                            for feat, imp in list(result.get('feature_importance', {}).items())[:5]:
+                                st.markdown(f"- {feat}: {imp:.4f}")
+                            
+                            st.rerun()
+                        else:
+                            st.error(result.get("error", "Training failed"))
+                
+                if recommendation.get("model_available"):
+                    st.info("A trained model is active and being used for predictions.")
+            
+            st.markdown("---")
+            st.markdown("""
+            ### How It Works
+            
+            This recommendation engine analyzes the relationship between your **posting activity** 
+            and **actual sales revenue**, not just likes or engagement metrics.
+            
+            The system:
+            1. Compares sales in the 3 days after each post to the 7-day baseline before
+            2. Identifies patterns in which days, times, and content types drive the most sales
+            3. Uses machine learning (when trained) to predict expected revenue for different scenarios
+            
+            **Key insight**: A post that gets fewer likes but drives more sales is more valuable to your business!
+            """)
+            
+    finally:
+        db.close()
+
+
 def show_data_management():
     db = SessionLocal()
     try:
@@ -957,7 +1145,7 @@ def main():
             
             page = st.radio(
                 "Go to",
-                ["Dashboard", "Product Analytics", "Best Day", "Trends", "Media Impact", "Data Management"],
+                ["Dashboard", "Product Analytics", "Best Day", "Trends", "Media Impact", "Post Recommendations", "Data Management"],
                 label_visibility="collapsed"
             )
             
@@ -979,6 +1167,8 @@ def main():
             show_trends()
         elif page == "Media Impact":
             show_media_impact()
+        elif page == "Post Recommendations":
+            show_post_recommendations()
         elif page == "Data Management":
             show_data_management()
 
