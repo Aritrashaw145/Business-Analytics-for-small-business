@@ -1075,54 +1075,101 @@ def show_data_management():
                 st.info("No media posts added yet. Add posts to track their impact on sales.")
         
         with tab4:
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.subheader("Quick Start")
-                st.markdown("Try the app with sample data to explore all features.")
-                
-                st.markdown("""
-                <div style="background: #f0fdf4; padding: 16px; border-radius: 10px; margin-bottom: 16px;">
-                    <div style="font-weight: 600;">Demo data includes:</div>
-                    <ul style="margin: 8px 0 0 0; padding-left: 20px;">
-                        <li>12 sample products</li>
-                        <li>90 days of sales data</li>
-                        <li>13 social media posts</li>
-                    </ul>
-                </div>
-                """, unsafe_allow_html=True)
-                
+            st.subheader("Quick Start with Demo Data")
+            demo_col1, demo_col2 = st.columns(2)
+            with demo_col1:
                 if st.button("Load Demo Data", use_container_width=True, type="primary"):
                     if generate_demo_data(db, st.session_state.business_id):
                         st.success("Demo data loaded! Go to Dashboard to see insights.")
                         st.rerun()
                     else:
                         st.warning("Demo data already exists.")
-                
+            with demo_col2:
                 if st.button("Clear All Data", use_container_width=True, type="secondary"):
                     clear_demo_data(db, st.session_state.business_id)
                     st.success("All data cleared.")
                     st.rerun()
             
-            with col2:
-                st.subheader("Import from CSV")
-                st.markdown("Upload sales data from your existing records.")
-                
+            st.divider()
+            
+            st.subheader("Import from CSV Files")
+            st.info("Import your data in 3 steps: First Products, then Sales, then Media Posts (optional)")
+            
+            import_tab1, import_tab2, import_tab3 = st.tabs(["1. Products", "2. Sales", "3. Media Posts"])
+            
+            with import_tab1:
+                st.markdown("### Step 1: Import Products")
                 st.markdown("""
-                **Required columns:**
-                - `product_name` - Must match your product names
-                - `quantity` - Number sold
-                - `sale_date` - YYYY-MM-DD format
-                """)
+                <div style="background: #eff6ff; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+                    <strong>Required Columns:</strong>
+                    <table style="width: 100%; margin-top: 8px;">
+                        <tr><td><code>name</code></td><td>Product name (e.g., Masala Chai)</td></tr>
+                        <tr><td><code>cost_price</code></td><td>Your cost in ₹ (e.g., 15)</td></tr>
+                        <tr><td><code>selling_price</code></td><td>Selling price in ₹ (e.g., 30)</td></tr>
+                    </table>
+                    <strong style="margin-top: 8px; display: block;">Optional:</strong>
+                    <table style="width: 100%; margin-top: 8px;">
+                        <tr><td><code>category</code></td><td>Product category (e.g., Beverages)</td></tr>
+                    </table>
+                </div>
+                """, unsafe_allow_html=True)
                 
-                uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+                st.markdown("**Example CSV:**")
+                st.code("name,cost_price,selling_price,category\nMasala Chai,15,30,Beverages\nSamosa,8,20,Snacks", language="csv")
                 
-                if uploaded_file is not None:
+                products_file = st.file_uploader("Upload Products CSV", type="csv", key="products_csv")
+                
+                if products_file is not None:
                     try:
-                        df = pd.read_csv(uploaded_file)
+                        df = pd.read_csv(products_file)
                         st.dataframe(df.head(5), use_container_width=True)
                         
-                        if st.button("Import Sales", use_container_width=True):
+                        if st.button("Import Products", use_container_width=True, type="primary", key="import_products_btn"):
+                            imported = 0
+                            for _, row in df.iterrows():
+                                name = str(row.get('name', '')).strip()
+                                if name:
+                                    product = Product(
+                                        business_id=st.session_state.business_id,
+                                        name=name,
+                                        cost_price=float(row.get('cost_price', 0)),
+                                        selling_price=float(row.get('selling_price', 0)),
+                                        category=str(row.get('category', 'General')) if pd.notna(row.get('category')) else 'General'
+                                    )
+                                    db.add(product)
+                                    imported += 1
+                            db.commit()
+                            st.success(f"Successfully imported {imported} products!")
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Error: {str(e)}")
+            
+            with import_tab2:
+                st.markdown("### Step 2: Import Sales")
+                st.warning("Make sure you have imported Products first! Product names must match exactly.")
+                
+                st.markdown("""
+                <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+                    <strong>Required Columns:</strong>
+                    <table style="width: 100%; margin-top: 8px;">
+                        <tr><td><code>product_name</code></td><td>Must match your product names exactly</td></tr>
+                        <tr><td><code>quantity</code></td><td>Number sold (e.g., 5)</td></tr>
+                        <tr><td><code>sale_date</code></td><td>Date in YYYY-MM-DD format (e.g., 2025-01-15)</td></tr>
+                    </table>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                st.markdown("**Example CSV:**")
+                st.code("product_name,quantity,sale_date\nMasala Chai,5,2025-01-15\nSamosa,10,2025-01-15", language="csv")
+                
+                sales_file = st.file_uploader("Upload Sales CSV", type="csv", key="sales_csv")
+                
+                if sales_file is not None:
+                    try:
+                        df = pd.read_csv(sales_file)
+                        st.dataframe(df.head(5), use_container_width=True)
+                        
+                        if st.button("Import Sales", use_container_width=True, type="primary", key="import_sales_btn"):
                             import_products = db.query(Product).filter(
                                 Product.business_id == st.session_state.business_id
                             ).all()
@@ -1130,9 +1177,10 @@ def show_data_management():
                             
                             imported = 0
                             errors = 0
+                            error_names = []
                             
                             for _, row in df.iterrows():
-                                product_name = str(row.get('product_name', '')).lower()
+                                product_name = str(row.get('product_name', '')).strip().lower()
                                 if product_name in product_map:
                                     product = product_map[product_name]
                                     quantity = int(row.get('quantity', 1))
@@ -1148,10 +1196,85 @@ def show_data_management():
                                     imported += 1
                                 else:
                                     errors += 1
+                                    if product_name not in error_names:
+                                        error_names.append(product_name)
                             
                             db.commit()
-                            st.success(f"Imported {imported} sales. {errors} skipped.")
-                            
+                            if errors > 0:
+                                st.warning(f"Imported {imported} sales. Skipped {errors} (product not found: {', '.join(error_names[:5])})")
+                            else:
+                                st.success(f"Successfully imported {imported} sales!")
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Error: {str(e)}")
+            
+            with import_tab3:
+                st.markdown("### Step 3: Import Media Posts (Optional)")
+                st.markdown("Import your social media posts to get AI-powered posting recommendations.")
+                
+                st.markdown("""
+                <div style="background: #fef3c7; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+                    <strong>Required Columns:</strong>
+                    <table style="width: 100%; margin-top: 8px;">
+                        <tr><td><code>post_type</code></td><td>reel, story, or image</td></tr>
+                        <tr><td><code>posted_at</code></td><td>Date in YYYY-MM-DD format</td></tr>
+                    </table>
+                    <strong style="margin-top: 8px; display: block;">Optional Columns:</strong>
+                    <table style="width: 100%; margin-top: 8px;">
+                        <tr><td><code>caption</code></td><td>Post caption text</td></tr>
+                        <tr><td><code>post_time</code></td><td>Time in HH:MM:SS format (e.g., 18:30:00)</td></tr>
+                        <tr><td><code>platform</code></td><td>instagram, facebook, etc.</td></tr>
+                        <tr><td><code>impressions</code></td><td>View count</td></tr>
+                        <tr><td><code>likes</code></td><td>Likes count</td></tr>
+                        <tr><td><code>comments</code></td><td>Comments count</td></tr>
+                        <tr><td><code>shares</code></td><td>Shares count</td></tr>
+                    </table>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                st.markdown("**Example CSV:**")
+                st.code("post_type,posted_at,post_time,caption,platform,impressions,likes,comments,shares\nreel,2025-01-10,18:30:00,New menu!,instagram,5000,200,25,15\nstory,2025-01-12,12:00:00,Behind scenes,instagram,2000,150,10,5", language="csv")
+                
+                posts_file = st.file_uploader("Upload Media Posts CSV", type="csv", key="posts_csv")
+                
+                if posts_file is not None:
+                    try:
+                        df = pd.read_csv(posts_file)
+                        st.dataframe(df.head(5), use_container_width=True)
+                        
+                        if st.button("Import Media Posts", use_container_width=True, type="primary", key="import_posts_btn"):
+                            from datetime import time as dt_time
+                            imported = 0
+                            for _, row in df.iterrows():
+                                post_type = str(row.get('post_type', 'image')).strip().lower()
+                                if post_type in ['reel', 'story', 'image']:
+                                    posted_at = pd.to_datetime(row.get('posted_at')).date()
+                                    
+                                    post_time = None
+                                    if pd.notna(row.get('post_time')):
+                                        try:
+                                            time_parts = str(row.get('post_time')).split(':')
+                                            post_time = dt_time(int(time_parts[0]), int(time_parts[1]), int(time_parts[2]) if len(time_parts) > 2 else 0)
+                                        except:
+                                            pass
+                                    
+                                    post = MediaPost(
+                                        business_id=st.session_state.business_id,
+                                        post_type=post_type,
+                                        caption=str(row.get('caption', ''))[:500] if pd.notna(row.get('caption')) else '',
+                                        posted_at=posted_at,
+                                        post_time=post_time,
+                                        platform=str(row.get('platform', 'instagram')) if pd.notna(row.get('platform')) else 'instagram',
+                                        impressions=int(row.get('impressions', 0)) if pd.notna(row.get('impressions')) else 0,
+                                        likes=int(row.get('likes', 0)) if pd.notna(row.get('likes')) else 0,
+                                        comments=int(row.get('comments', 0)) if pd.notna(row.get('comments')) else 0,
+                                        shares=int(row.get('shares', 0)) if pd.notna(row.get('shares')) else 0
+                                    )
+                                    db.add(post)
+                                    imported += 1
+                            db.commit()
+                            st.success(f"Successfully imported {imported} media posts!")
+                            st.rerun()
                     except Exception as e:
                         st.error(f"Error: {str(e)}")
                     
