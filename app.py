@@ -207,6 +207,72 @@ def show_dashboard():
                 delta=None
             )
         
+        recommendations = get_business_recommendations(db, st.session_state.business_id)
+        
+        health_color = "#10b981" if recommendations["health_score"] >= 70 else (
+            "#f59e0b" if recommendations["health_score"] >= 40 else "#ef4444"
+        )
+        trend_icon = "📈" if recommendations.get("growth_trend") == "growing" else (
+            "📉" if recommendations.get("growth_trend") == "declining" else "➡️"
+        )
+        
+        st.markdown("")
+        
+        if "show_outcome" not in st.session_state:
+            st.session_state.show_outcome = False
+        
+        outcome_btn = st.button("🎯 VIEW YOUR ACTION ITEMS - Click to see what to do next!", 
+                                use_container_width=True, type="primary", key="outcome_btn")
+        
+        if outcome_btn:
+            st.session_state.show_outcome = not st.session_state.show_outcome
+        
+        if st.session_state.show_outcome:
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                        padding: 20px; border-radius: 12px; color: white; text-align: center; margin: 16px 0;">
+                <div style="font-size: 1.2rem; margin-bottom: 8px;">Business Health Score</div>
+                <div style="font-size: 3rem; font-weight: bold;">{recommendations["health_score"]}/100</div>
+                <div style="font-size: 1rem; opacity: 0.9; margin-top: 8px;">
+                    {trend_icon} Sales {recommendations.get("growth_trend", "stable").capitalize()} | Focus: {recommendations["focus_area"]}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("### What You Should Do Next")
+            
+            for rec in recommendations["recommendations"]:
+                if rec["priority"] == "high":
+                    priority_color = "#ef4444"
+                    bg_color = "#fef2f2"
+                    border_color = "#fecaca"
+                    priority_label = "HIGH PRIORITY"
+                elif rec["priority"] == "medium":
+                    priority_color = "#f59e0b"
+                    bg_color = "#fffbeb"
+                    border_color = "#fde68a"
+                    priority_label = "MEDIUM"
+                else:
+                    priority_color = "#10b981"
+                    bg_color = "#ecfdf5"
+                    border_color = "#a7f3d0"
+                    priority_label = "LOW"
+                
+                st.markdown(f"""
+                <div style="background: {bg_color}; padding: 16px; border-radius: 10px; margin-bottom: 12px; 
+                            border: 2px solid {border_color}; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 1.5rem;">{rec["icon"]}</span>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; font-size: 1.1rem; color: #1f2937;">{rec["title"]}</div>
+                            <div style="color: #4b5563; font-size: 0.95rem; margin-top: 4px;">{rec["description"]}</div>
+                        </div>
+                        <span style="background: {priority_color}; color: white; padding: 4px 12px; 
+                                     border-radius: 20px; font-size: 0.75rem; font-weight: 600;">{priority_label}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+        
         st.divider()
         
         col1, col2 = st.columns(2)
@@ -259,63 +325,6 @@ def show_dashboard():
         else:
             st.info("Not enough data for trends yet.")
         
-        st.divider()
-        
-        recommendations = get_business_recommendations(db, st.session_state.business_id)
-        
-        health_color = "#10b981" if recommendations["health_score"] >= 70 else (
-            "#f59e0b" if recommendations["health_score"] >= 40 else "#ef4444"
-        )
-        trend_icon = "📈" if recommendations.get("growth_trend") == "growing" else (
-            "📉" if recommendations.get("growth_trend") == "declining" else "➡️"
-        )
-        
-        with st.expander("OUTCOME - Click to See Your Action Items", expanded=False):
-            st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                        padding: 20px; border-radius: 12px; color: white; text-align: center; margin-bottom: 20px;">
-                <div style="font-size: 1.2rem; margin-bottom: 8px;">Business Health Score</div>
-                <div style="font-size: 3rem; font-weight: bold;">{recommendations["health_score"]}/100</div>
-                <div style="font-size: 1rem; opacity: 0.9; margin-top: 8px;">
-                    {trend_icon} Sales {recommendations.get("growth_trend", "stable").capitalize()} | Focus: {recommendations["focus_area"]}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown("### What You Should Do Next")
-            
-            for rec in recommendations["recommendations"]:
-                if rec["priority"] == "high":
-                    priority_color = "#ef4444"
-                    bg_color = "#fef2f2"
-                    border_color = "#fecaca"
-                    priority_label = "HIGH PRIORITY"
-                elif rec["priority"] == "medium":
-                    priority_color = "#f59e0b"
-                    bg_color = "#fffbeb"
-                    border_color = "#fde68a"
-                    priority_label = "MEDIUM"
-                else:
-                    priority_color = "#10b981"
-                    bg_color = "#ecfdf5"
-                    border_color = "#a7f3d0"
-                    priority_label = "LOW"
-                
-                st.markdown(f"""
-                <div style="background: {bg_color}; padding: 16px; border-radius: 10px; margin-bottom: 12px; 
-                            border: 2px solid {border_color}; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <span style="font-size: 1.5rem;">{rec["icon"]}</span>
-                        <div style="flex: 1;">
-                            <div style="font-weight: 600; font-size: 1.1rem; color: #1f2937;">{rec["title"]}</div>
-                            <div style="color: #4b5563; font-size: 0.95rem; margin-top: 4px;">{rec["description"]}</div>
-                        </div>
-                        <span style="background: {priority_color}; color: white; padding: 4px 12px; 
-                                     border-radius: 20px; font-size: 0.75rem; font-weight: 600;">{priority_label}</span>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-            
     finally:
         db.close()
 
@@ -1109,18 +1118,39 @@ def show_data_management():
             
             step_cols = st.columns(3)
             with step_cols[0]:
-                step1_style = "background: #3b82f6; color: white;" if st.session_state.import_step == 1 else "background: #e5e7eb; color: #6b7280;"
-                if st.button("1. Products", use_container_width=True, key="step1_btn"):
+                step1_active = st.session_state.import_step == 1
+                step1_bg = "#1e40af" if step1_active else "#374151"
+                st.markdown(f"""
+                <div style="background: {step1_bg}; color: white; padding: 12px 16px; border-radius: 8px; 
+                            text-align: center; font-weight: 600; cursor: pointer; margin-bottom: 8px;">
+                    1. Products {"✓" if st.session_state.import_step > 1 else ""}
+                </div>
+                """, unsafe_allow_html=True)
+                if st.button("Select Products", use_container_width=True, key="step1_btn", type="secondary" if not step1_active else "primary"):
                     st.session_state.import_step = 1
                     st.rerun()
             with step_cols[1]:
-                step2_style = "background: #3b82f6; color: white;" if st.session_state.import_step == 2 else "background: #e5e7eb; color: #6b7280;"
-                if st.button("2. Sales", use_container_width=True, key="step2_btn"):
+                step2_active = st.session_state.import_step == 2
+                step2_bg = "#1e40af" if step2_active else "#374151"
+                st.markdown(f"""
+                <div style="background: {step2_bg}; color: white; padding: 12px 16px; border-radius: 8px; 
+                            text-align: center; font-weight: 600; cursor: pointer; margin-bottom: 8px;">
+                    2. Sales {"✓" if st.session_state.import_step > 2 else ""}
+                </div>
+                """, unsafe_allow_html=True)
+                if st.button("Select Sales", use_container_width=True, key="step2_btn", type="secondary" if not step2_active else "primary"):
                     st.session_state.import_step = 2
                     st.rerun()
             with step_cols[2]:
-                step3_style = "background: #3b82f6; color: white;" if st.session_state.import_step == 3 else "background: #e5e7eb; color: #6b7280;"
-                if st.button("3. Media Posts", use_container_width=True, key="step3_btn"):
+                step3_active = st.session_state.import_step == 3
+                step3_bg = "#1e40af" if step3_active else "#374151"
+                st.markdown(f"""
+                <div style="background: {step3_bg}; color: white; padding: 12px 16px; border-radius: 8px; 
+                            text-align: center; font-weight: 600; cursor: pointer; margin-bottom: 8px;">
+                    3. Media Posts
+                </div>
+                """, unsafe_allow_html=True)
+                if st.button("Select Media Posts", use_container_width=True, key="step3_btn", type="secondary" if not step3_active else "primary"):
                     st.session_state.import_step = 3
                     st.rerun()
             
@@ -1304,7 +1334,8 @@ def show_data_management():
                                     db.add(post)
                                     imported += 1
                             db.commit()
-                            st.success(f"Successfully imported {imported} media posts!")
+                            st.success(f"Successfully imported {imported} media posts! Redirecting to Dashboard...")
+                            st.session_state.redirect_to_dashboard = True
                             st.rerun()
                     except Exception as e:
                         st.error(f"Error: {str(e)}")
@@ -1317,16 +1348,30 @@ def main():
     if not st.session_state.authenticated:
         show_auth_page()
     else:
+        if st.session_state.get("redirect_to_dashboard"):
+            st.session_state.redirect_to_dashboard = False
+            st.session_state.current_page = "Dashboard"
+        
+        if "current_page" not in st.session_state:
+            st.session_state.current_page = "Dashboard"
+        
         with st.sidebar:
             st.title("Navigation")
             st.markdown(f"**{st.session_state.business_name}**")
             st.divider()
             
+            pages = ["Dashboard", "Product Analytics", "Best Day", "Trends", "Media Impact", "Post Recommendations", "Data Management"]
+            current_index = pages.index(st.session_state.current_page) if st.session_state.current_page in pages else 0
+            
             page = st.radio(
                 "Go to",
-                ["Dashboard", "Product Analytics", "Best Day", "Trends", "Media Impact", "Post Recommendations", "Data Management"],
+                pages,
+                index=current_index,
                 label_visibility="collapsed"
             )
+            
+            if page != st.session_state.current_page:
+                st.session_state.current_page = page
             
             st.divider()
             

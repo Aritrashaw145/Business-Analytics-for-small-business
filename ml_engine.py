@@ -297,12 +297,32 @@ def get_best_posting_recommendation(db: Session, business_id: int) -> Dict[str, 
         return {"error": "No products found", "recommendations": []}
     
     seven_days_ago = datetime.now().date() - timedelta(days=7)
-    recent_sales = db.query(func.avg(Sale.total_amount)).filter(
+    recent_sales = db.query(Sale).filter(
         Sale.product_id.in_(product_ids),
         Sale.sale_date >= seven_days_ago
-    ).scalar() or 0
+    ).all()
     
-    recent_revenue_avg = float(recent_sales) * 5
+    if recent_sales:
+        daily_revenues = {}
+        for sale in recent_sales:
+            date_key = sale.sale_date
+            if date_key not in daily_revenues:
+                daily_revenues[date_key] = 0
+            daily_revenues[date_key] += sale.total_amount
+        
+        recent_revenue_avg = sum(daily_revenues.values()) / max(len(daily_revenues), 1)
+    else:
+        all_sales = db.query(Sale).filter(Sale.product_id.in_(product_ids)).all()
+        if all_sales:
+            daily_revenues = {}
+            for sale in all_sales:
+                date_key = sale.sale_date
+                if date_key not in daily_revenues:
+                    daily_revenues[date_key] = 0
+                daily_revenues[date_key] += sale.total_amount
+            recent_revenue_avg = sum(daily_revenues.values()) / max(len(daily_revenues), 1)
+        else:
+            recent_revenue_avg = 1000
     
     slot_analysis = calculate_post_impact_by_slot(db, business_id)
     
