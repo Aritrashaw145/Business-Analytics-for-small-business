@@ -285,23 +285,32 @@ def show_dashboard():
             st.markdown("### What You Should Do Next")
             
             for rec in recommendations["recommendations"]:
-                priority_color = "#ef4444" if rec["priority"] == "high" else (
-                    "#f59e0b" if rec["priority"] == "medium" else "#10b981"
-                )
-                priority_label = "HIGH PRIORITY" if rec["priority"] == "high" else (
-                    "MEDIUM" if rec["priority"] == "medium" else "LOW"
-                )
+                if rec["priority"] == "high":
+                    priority_color = "#ef4444"
+                    bg_color = "#fef2f2"
+                    border_color = "#fecaca"
+                    priority_label = "HIGH PRIORITY"
+                elif rec["priority"] == "medium":
+                    priority_color = "#f59e0b"
+                    bg_color = "#fffbeb"
+                    border_color = "#fde68a"
+                    priority_label = "MEDIUM"
+                else:
+                    priority_color = "#10b981"
+                    bg_color = "#ecfdf5"
+                    border_color = "#a7f3d0"
+                    priority_label = "LOW"
                 
                 st.markdown(f"""
-                <div style="background: white; padding: 16px; border-radius: 10px; margin-bottom: 12px; 
-                            border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <div style="background: {bg_color}; padding: 16px; border-radius: 10px; margin-bottom: 12px; 
+                            border: 2px solid {border_color}; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                     <div style="display: flex; align-items: center; gap: 12px;">
                         <span style="font-size: 1.5rem;">{rec["icon"]}</span>
                         <div style="flex: 1;">
-                            <div style="font-weight: 600; font-size: 1.1rem;">{rec["title"]}</div>
-                            <div style="color: #666; font-size: 0.95rem; margin-top: 4px;">{rec["description"]}</div>
+                            <div style="font-weight: 600; font-size: 1.1rem; color: #1f2937;">{rec["title"]}</div>
+                            <div style="color: #4b5563; font-size: 0.95rem; margin-top: 4px;">{rec["description"]}</div>
                         </div>
-                        <span style="background: {priority_color}22; color: {priority_color}; padding: 4px 12px; 
+                        <span style="background: {priority_color}; color: white; padding: 4px 12px; 
                                      border-radius: 20px; font-size: 0.75rem; font-weight: 600;">{priority_label}</span>
                     </div>
                 </div>
@@ -1095,9 +1104,29 @@ def show_data_management():
             st.subheader("Import from CSV Files")
             st.info("Import your data in 3 steps: First Products, then Sales, then Media Posts (optional)")
             
-            import_tab1, import_tab2, import_tab3 = st.tabs(["1. Products", "2. Sales", "3. Media Posts"])
+            if "import_step" not in st.session_state:
+                st.session_state.import_step = 1
             
-            with import_tab1:
+            step_cols = st.columns(3)
+            with step_cols[0]:
+                step1_style = "background: #3b82f6; color: white;" if st.session_state.import_step == 1 else "background: #e5e7eb; color: #6b7280;"
+                if st.button("1. Products", use_container_width=True, key="step1_btn"):
+                    st.session_state.import_step = 1
+                    st.rerun()
+            with step_cols[1]:
+                step2_style = "background: #3b82f6; color: white;" if st.session_state.import_step == 2 else "background: #e5e7eb; color: #6b7280;"
+                if st.button("2. Sales", use_container_width=True, key="step2_btn"):
+                    st.session_state.import_step = 2
+                    st.rerun()
+            with step_cols[2]:
+                step3_style = "background: #3b82f6; color: white;" if st.session_state.import_step == 3 else "background: #e5e7eb; color: #6b7280;"
+                if st.button("3. Media Posts", use_container_width=True, key="step3_btn"):
+                    st.session_state.import_step = 3
+                    st.rerun()
+            
+            st.markdown("---")
+            
+            if st.session_state.import_step == 1:
                 st.markdown("### Step 1: Import Products")
                 st.markdown("""
                 <div style="background: #eff6ff; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
@@ -1124,7 +1153,7 @@ def show_data_management():
                         df = pd.read_csv(products_file)
                         st.dataframe(df.head(5), use_container_width=True)
                         
-                        if st.button("Import Products", use_container_width=True, type="primary", key="import_products_btn"):
+                        if st.button("Import Products & Go to Sales", use_container_width=True, type="primary", key="import_products_btn"):
                             imported = 0
                             for _, row in df.iterrows():
                                 name = str(row.get('name', '')).strip()
@@ -1139,12 +1168,13 @@ def show_data_management():
                                     db.add(product)
                                     imported += 1
                             db.commit()
-                            st.success(f"Successfully imported {imported} products!")
+                            st.success(f"Successfully imported {imported} products! Moving to Sales import...")
+                            st.session_state.import_step = 2
                             st.rerun()
                     except Exception as e:
                         st.error(f"Error: {str(e)}")
             
-            with import_tab2:
+            elif st.session_state.import_step == 2:
                 st.markdown("### Step 2: Import Sales")
                 st.warning("Make sure you have imported Products first! Product names must match exactly.")
                 
@@ -1203,12 +1233,13 @@ def show_data_management():
                             if errors > 0:
                                 st.warning(f"Imported {imported} sales. Skipped {errors} (product not found: {', '.join(error_names[:5])})")
                             else:
-                                st.success(f"Successfully imported {imported} sales!")
+                                st.success(f"Successfully imported {imported} sales! Moving to Media Posts...")
+                            st.session_state.import_step = 3
                             st.rerun()
                     except Exception as e:
                         st.error(f"Error: {str(e)}")
             
-            with import_tab3:
+            elif st.session_state.import_step == 3:
                 st.markdown("### Step 3: Import Media Posts (Optional)")
                 st.markdown("Import your social media posts to get AI-powered posting recommendations.")
                 

@@ -137,13 +137,16 @@ def get_weekly_trends(db: Session, business_id: int, weeks: int = 8) -> List[Dic
     if not product_ids:
         return []
     
-    end_date = datetime.now().date()
-    start_date = end_date - timedelta(weeks=weeks)
-    
     sales = db.query(Sale).filter(
-        Sale.product_id.in_(product_ids),
-        Sale.sale_date >= start_date
+        Sale.product_id.in_(product_ids)
     ).all()
+    
+    if not sales:
+        return []
+    
+    all_dates = [s.sale_date for s in sales]
+    start_date = min(all_dates)
+    end_date = max(all_dates)
     
     weekly_data = {}
     for sale in sales:

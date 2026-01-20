@@ -20,21 +20,25 @@ def get_sales_features(db: Session, business_id: int) -> pd.DataFrame:
     if not product_ids:
         return pd.DataFrame()
     
-    end_date = datetime.now().date()
-    start_date = end_date - timedelta(days=180)
-    
     sales = db.query(Sale).filter(
-        Sale.product_id.in_(product_ids),
-        Sale.sale_date >= start_date
+        Sale.product_id.in_(product_ids)
     ).all()
     
     posts = db.query(MediaPost).filter(
-        MediaPost.business_id == business_id,
-        MediaPost.posted_at >= start_date
+        MediaPost.business_id == business_id
     ).all()
     
     if not sales:
         return pd.DataFrame()
+    
+    valid_dates = [s.sale_date for s in sales if s.sale_date]
+    valid_dates.extend([p.posted_at for p in posts if p.posted_at])
+    
+    if not valid_dates:
+        return pd.DataFrame()
+    
+    start_date = min(valid_dates)
+    end_date = max(valid_dates + [datetime.now().date()])
     
     daily_data = {}
     current = start_date
@@ -178,8 +182,8 @@ def train_post_impact_model(db: Session, business_id: int) -> Dict[str, Any]:
     
     df = get_sales_features(db, business_id)
     
-    if df.empty or len(df) < 30:
-        return {"success": False, "error": "Insufficient data. Need at least 30 days of sales."}
+    if df.empty or len(df) < 7:
+        return {"success": False, "error": "Insufficient data. Need at least 7 days of sales."}
     
     feature_cols = [
         "day_of_week", "is_weekend",
@@ -195,7 +199,7 @@ def train_post_impact_model(db: Session, business_id: int) -> Dict[str, Any]:
     X = df[available_cols]
     y = df["revenue"]
     
-    if len(X) < 30:
+    if len(X) < 7:
         return {"success": False, "error": "Not enough data for training"}
     
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -321,7 +325,9 @@ def get_best_posting_recommendation(db: Session, business_id: int) -> Dict[str, 
                 )
                 
                 uplift = predicted_with_post - predicted_without_post
-                uplift_percent = (uplift / predicted_without_post * 100) if predicted_without_post > 0 else 0
+                baseline = max(predicted_without_post, baseline_revenue, 1)
+                uplift_percent = (uplift / baseline * 100) if baseline > 0 else 0
+                uplift_percent = max(0, min(uplift_percent, 200))
                 
                 scenarios.append({
                     "day": day_name,
