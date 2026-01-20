@@ -33,6 +33,30 @@ from ml_engine import (
 
 init_db()
 
+DEMO_EMAIL = "demo@example.com"
+DEMO_PASSWORD = "demo123"
+
+def ensure_demo_account():
+    """Create demo account with demo data if it doesn't exist"""
+    db = SessionLocal()
+    try:
+        existing = get_business_by_email(db, DEMO_EMAIL)
+        if not existing:
+            business = create_business(
+                db,
+                name="Demo Business",
+                owner_name="Demo User",
+                email=DEMO_EMAIL,
+                password=DEMO_PASSWORD,
+                category="Food & Beverage"
+            )
+            if business:
+                generate_demo_data(db, business.id)
+    finally:
+        db.close()
+
+ensure_demo_account()
+
 st.set_page_config(
     page_title="Business Analytics",
     page_icon="📊",
@@ -85,9 +109,10 @@ def show_auth_page():
         
         with tab1:
             st.subheader("Welcome Back")
+            st.caption(f"Demo: {DEMO_EMAIL} / {DEMO_PASSWORD}")
             with st.form("login_form"):
-                email = st.text_input("Email", key="login_email")
-                password = st.text_input("Password", type="password", key="login_password")
+                email = st.text_input("Email", placeholder=DEMO_EMAIL, key="login_email")
+                password = st.text_input("Password", type="password", placeholder=DEMO_PASSWORD, key="login_password")
                 submit = st.form_submit_button("Login", use_container_width=True)
                 
                 if submit:
