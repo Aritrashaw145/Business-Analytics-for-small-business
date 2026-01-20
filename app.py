@@ -912,9 +912,26 @@ def show_data_management():
             
             st.divider()
         
-        tab1, tab2, tab3, tab4 = st.tabs(["Add Products", "Record Sales", "Media Posts", "Import / Demo"])
+        if "data_mgmt_tab" not in st.session_state:
+            st.session_state.data_mgmt_tab = "Add Products"
         
-        with tab1:
+        tab_options = ["Add Products", "Record Sales", "Media Posts", "Import / Demo"]
+        current_tab_idx = tab_options.index(st.session_state.data_mgmt_tab) if st.session_state.data_mgmt_tab in tab_options else 0
+        
+        selected_tab = st.radio(
+            "Choose Action",
+            tab_options,
+            index=current_tab_idx,
+            horizontal=True,
+            key="data_mgmt_tab_radio"
+        )
+        
+        if selected_tab != st.session_state.data_mgmt_tab:
+            st.session_state.data_mgmt_tab = selected_tab
+        
+        st.markdown("---")
+        
+        if selected_tab == "Add Products":
             st.subheader("Add Your Products")
             st.markdown("Enter the products you sell with their costs and prices.")
             
@@ -972,7 +989,7 @@ def show_data_management():
             else:
                 st.info("No products added yet. Add your first product above!")
         
-        with tab2:
+        elif selected_tab == "Record Sales":
             st.subheader("Record Your Sales")
             st.markdown("Log sales as they happen or at the end of each day.")
             
@@ -1035,7 +1052,7 @@ def show_data_management():
             else:
                 st.warning("Add products first before recording sales. Go to the 'Add Products' tab.")
         
-        with tab3:
+        elif selected_tab == "Media Posts":
             st.subheader("Media Posts")
             st.markdown("Track your social media posts (reels and stories)")
             
@@ -1092,7 +1109,7 @@ def show_data_management():
             else:
                 st.info("No media posts added yet. Add posts to track their impact on sales.")
         
-        with tab4:
+        elif selected_tab == "Import / Demo":
             st.subheader("Quick Start with Demo Data")
             demo_col1, demo_col2 = st.columns(2)
             with demo_col1:
@@ -1200,6 +1217,7 @@ def show_data_management():
                             db.commit()
                             st.success(f"Successfully imported {imported} products! Moving to Sales import...")
                             st.session_state.import_step = 2
+                            st.session_state.data_mgmt_tab = "Import / Demo"
                             st.rerun()
                     except Exception as e:
                         st.error(f"Error: {str(e)}")
@@ -1265,6 +1283,7 @@ def show_data_management():
                             else:
                                 st.success(f"Successfully imported {imported} sales! Moving to Media Posts...")
                             st.session_state.import_step = 3
+                            st.session_state.data_mgmt_tab = "Import / Demo"
                             st.rerun()
                     except Exception as e:
                         st.error(f"Error: {str(e)}")
