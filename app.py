@@ -31,12 +31,6 @@ from ml_engine import (
     train_post_impact_model
 )
 
-@st.cache_resource
-def init_app():
-    init_db()
-    ensure_demo_account()
-
-init_app()
 
 DEMO_EMAIL = "demo@example.com"
 DEMO_PASSWORD = "demo123"
@@ -59,6 +53,13 @@ def ensure_demo_account():
                 generate_demo_data(db, business.id)
     finally:
         db.close()
+
+@st.cache_resource
+def init_app():
+    init_db()
+    ensure_demo_account()
+
+init_app()
 
 ensure_demo_account()
 
